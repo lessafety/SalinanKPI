@@ -1558,5 +1558,11 @@ async function handleUpdateSubmit(e, originalId) {
     submitButton.classList.add('loading');
     submitButton.textContent = 'Mengupdate...';
 
-  const originalItem = formData;
+    const originalItem = formData;
 
+    try {
+        // kode update di sini
+    } catch (error) {
+        console.error('Terjadi error saat update:', error);
+    }
+}
