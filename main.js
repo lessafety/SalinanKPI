@@ -1558,7 +1558,9 @@ async function handleUpdateSubmit(e, originalId) {
     submitButton.classList.add('loading');
     submitButton.textContent = 'Mengupdate...';
 
-    try {
-        // Find original item
-        const originalItem = formData
-    }
+   try {
+    // Find original item
+    const originalItem = formData;
+} catch (error) {
+    console.error('Terjadi error saat mencari item asli:', error);
+}
