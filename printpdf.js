@@ -79,7 +79,7 @@ async function printPdf() {
           <th colspan="2" style="text-align: left; padding: 2mm; border: 1px solid #000;">Unit: ${headerUnit}</th>
           <th colspan="3" style="text-align: left; padding: 2mm; border: 1px solid #000;">Mfg: ${headerMFG}</th>
           <th colspan="3" style="text-align: left; padding: 2mm; border: 1px solid #000;">Tipe: ${headerType}</th>
-          <th colspan="4" style="padding: 2mm; border: 1px solid #000;">&nbsp;</th>
+        
         </tr>
       </table>
 
