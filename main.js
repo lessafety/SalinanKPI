@@ -1,3 +1,4 @@
+
 // Configuration object for Element SDK
 const defaultConfig = {
     company_name: "PT. JAYA KENCANA",
@@ -1558,11 +1559,288 @@ async function handleUpdateSubmit(e, originalId) {
     submitButton.classList.add('loading');
     submitButton.textContent = 'Mengupdate...';
 
-    const originalItem = formData;
-
     try {
-        // kode update di sini
+        // Find original item
+        const originalItem = formData.find(d => d.id === originalId);
+        if (!originalItem) {
+            showMessage("Data asli tidak ditemukan", "error");
+            return;
+        }
+
+        // Collect updated form data
+        const updatedData = {
+            ...originalItem,
+            building_name: document.getElementById('buildingName').value,
+            technician: getSelectedTechnicians(),
+            date: document.getElementById('workDate').value,
+            header_unit: document.getElementById('headerUnit').value,
+            header_mfg: document.getElementById('headerMFG').value,
+            header_type: document.getElementById('headerType').value,
+            items: collectItemsData(),
+            additional_work: collectAdditionalWorkData(),
+            status: 'updated'
+        };
+
+        // Update via Data SDK
+        const result = await window.dataSdk.update(updatedData);
+
+        if (result.isOk) {
+            showMessage("Data berhasil diupdate!", "success");
+
+            // Navigate back to history
+            navigateToSection('history');
+        } else {
+            showMessage("Gagal mengupdate data. Silakan coba lagi.", "error");
+        }
     } catch (error) {
-        console.error('Terjadi error saat update:', error);
+        showMessage("Terjadi kesalahan. Silakan coba lagi.", "error");
+    } finally {
+        // Reset loading state
+        submitButton.classList.remove('loading');
+        submitButton.textContent = 'Update Data';
     }
 }
+
+// Delete data (admin only)
+async function deleteData(itemId) {
+    if (currentUserType !== 'admin') return;
+
+    const item = formData.find(d => d.id === itemId);
+    if (!item) return;
+
+    // Create inline confirmation
+    const historyItem = document.querySelector(`[onclick*="${itemId}"]`).closest('.history-item');
+    const deleteBtn = historyItem.querySelector(`[onclick*="deleteData('${itemId}')"]`);
+
+    if (deleteBtn.textContent === '🗑️ Delete') {
+        // First click - show confirmation
+        deleteBtn.textContent = 'Konfirmasi Hapus?';
+        deleteBtn.style.background = 'linear-gradient(45deg, #f44336, #d32f2f)';
+
+        // Add cancel button
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn-small';
+        cancelBtn.textContent = 'Batal';
+        cancelBtn.style.background = 'rgba(255,255,255,0.1)';
+        cancelBtn.style.color = 'white';
+        cancelBtn.style.border = '1px solid rgba(255,255,255,0.3)';
+        cancelBtn.onclick = () => {
+            deleteBtn.textContent = '🗑️ Delete';
+            deleteBtn.style.background = '';
+            cancelBtn.remove();
+        };
+
+        deleteBtn.parentNode.insertBefore(cancelBtn, deleteBtn.nextSibling);
+
+        // Reset after 5 seconds
+        setTimeout(() => {
+            if (deleteBtn.textContent === 'Konfirmasi Hapus?') {
+                deleteBtn.textContent = '🗑️ Delete';
+                deleteBtn.style.background = '';
+                if (cancelBtn.parentNode) cancelBtn.remove();
+            }
+        }, 5000);
+
+    } else if (deleteBtn.textContent === 'Konfirmasi Hapus?') {
+        // Second click - actually delete
+        deleteBtn.textContent = 'Menghapus...';
+        deleteBtn.disabled = true;
+
+        try {
+            const result = await window.dataSdk.delete(item);
+            if (result.isOk) {
+                showMessage("Data berhasil dihapus!", "success");
+                // Remove the history item from DOM
+                historyItem.remove();
+            } else {
+                showMessage("Gagal menghapus data.", "error");
+                deleteBtn.textContent = '🗑️ Delete';
+                deleteBtn.disabled = false;
+            }
+        } catch (error) {
+            showMessage("Terjadi kesalahan saat menghapus data.", "error");
+            deleteBtn.textContent = '🗑️ Delete';
+            deleteBtn.disabled = false;
+        }
+    }
+}
+
+// Review data (admin only)
+function reviewData(itemId) {
+    if (currentUserType !== 'admin') return;
+
+    const item = formData.find(d => d.id === itemId);
+    if (!item) return;
+
+    const contentArea = document.getElementById('contentArea');
+
+    let itemsHtml = '';
+    if (item.items) {
+        try {
+            const items = JSON.parse(item.items);
+            itemsHtml = items.map((itm, idx) => `
+                        <div class="item-container">
+                            <h4 style="color: #00d4ff; margin-bottom: 10px;">Item ${idx + 1}</h4>
+                            ${Object.entries(itm).map(([key, value]) => `
+                                <div style="margin-bottom: 8px;">
+                                    <strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> ${value}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `).join('');
+        } catch (e) {
+            itemsHtml = '<p>Error parsing items data</p>';
+        }
+    }
+
+    let worksHtml = '';
+    if (item.additional_work) {
+        try {
+            const works = JSON.parse(item.additional_work);
+            worksHtml = works.map((work, idx) => `
+                        <div class="item-container">
+                            <h4 style="color: #00d4ff; margin-bottom: 10px;">Pekerjaan ${idx + 1}</h4>
+                            ${Object.entries(work).map(([key, value]) => `
+                                <div style="margin-bottom: 8px;">
+                                    <strong>${key.replace(/_/g, ' ').toUpperCase()}:</strong> ${value}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `).join('');
+        } catch (e) {
+            worksHtml = '<p>Error parsing work data</p>';
+        }
+    }
+
+    contentArea.innerHTML = `
+                <div class="form-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 class="section-title" style="margin: 0;">Review Data - ${item.form_type?.toUpperCase()}</h2>
+                        <button type="button" class="btn-small" onclick="navigateToSection('history')" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3);">← Kembali ke History</button>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Nama Gedung/Proyek</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.building_name || 'N/A'}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Teknisi</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.technician || 'N/A'}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Tanggal</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.date || 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Unit</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.header_unit || 'N/A'}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">MFG</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.header_mfg || 'N/A'}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Type</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.header_type || 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Status</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.status || 'N/A'}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Dibuat</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${new Date(item.created_at).toLocaleString('id-ID')}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">User</label>
+                            <div style="padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; color: #e0e0e0;">
+                                ${item.username || 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${itemsHtml ? `
+                        <div class="section-title" style="margin-top: 30px;">ITEMS</div>
+                        ${itemsHtml}
+                    ` : ''}
+                    
+                    ${worksHtml ? `
+                        <div class="section-title" style="margin-top: 30px;">PEKERJAAN TAMBAHAN</div>
+                        ${worksHtml}
+                    ` : ''}
+                    
+                    <div style="margin-top: 30px; text-align: center;">
+                        <button class="btn-primary" onclick="editData('${item.id}')" style="margin-right: 10px;">✏️ Edit Data Ini</button>
+                        <button class="btn-primary" onclick="approveData('${item.id}')" style="background: linear-gradient(45deg, #4caf50, #45a049);">✅ Approve</button>
+                    </div>
+                </div>
+            `;
+}
+
+// Approve data (admin only)
+async function approveData(itemId) {
+    if (currentUserType !== 'admin') return;
+
+    const item = formData.find(d => d.id === itemId);
+    if (!item) return;
+
+    try {
+        const updatedData = {
+            ...item,
+            status: 'approved'
+        };
+
+        const result = await window.dataSdk.update(updatedData);
+
+        if (result.isOk) {
+            showMessage("Data berhasil di-approve!", "success");
+            navigateToSection('history');
+        } else {
+            showMessage("Gagal approve data.", "error");
+        }
+    } catch (error) {
+        showMessage("Terjadi kesalahan saat approve data.", "error");
+    }
+}
+
+// Back to navigation
+function backToNavigation() {
+    document.querySelector('.navigation-grid').style.display = 'grid';
+    document.getElementById('contentArea').innerHTML = '';
+    document.querySelectorAll('.nav-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    currentSection = null;
+}
+
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', initializeApp);
