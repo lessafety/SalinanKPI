@@ -905,7 +905,7 @@ function handleWorkPhotoUpload(input, workId, photoId) {
 }
 
 // Handle form submit
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbz66JFEPxVI9wULxsehPmBbda4itNbk6WdSj1LaKvr9Hksi2da6uwsnYsDRArAMelMyBA/exec'; // URL dari Google Apps Script kamu
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwNu3XUs99t7O92pB55zQhGa1bmFkLNPQCLlS_wPMlewi6orjESuaySh6_a5vt523o-/exec'; // URL dari Google Apps Script kamu
 
 async function handleFormSubmit(e) {
     e.preventDefault();
